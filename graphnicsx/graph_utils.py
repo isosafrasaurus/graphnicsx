@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable
+from typing import Dict, Iterable, List, Tuple
+
+import networkx as nx
+import numpy as np
 
 import dolfinx
 import dolfinx.fem
 import dolfinx.geometry
-import networkx as nx
-import numpy as np
+import ufl
 
 from .fenics_graph import FenicsGraph
 
@@ -80,9 +82,9 @@ def plot_graph_color(G: nx.Graph, *, ax=None):
 
 
 def assign_radius_using_Murrays_law(
-        G: nx.DiGraph,
-        start_node: int,
-        start_radius: float,
+    G: nx.DiGraph,
+    start_node: int,
+    start_radius: float,
 ) -> FenicsGraph:
     
     G_bfs = nx.bfs_tree(G, source=start_node)
