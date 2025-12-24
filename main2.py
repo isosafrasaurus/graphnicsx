@@ -24,7 +24,6 @@ def _cell_name(msh: mesh.Mesh) -> str:
 
 
 def locate_boundary_dofs(V) -> np.ndarray:
-    
     msh = V.mesh
     tdim = msh.topology.dim
     if tdim == 1:
@@ -41,7 +40,6 @@ def locate_boundary_dofs(V) -> np.ndarray:
 
 
 def locate_boundary_dofs_mixed_subspace(W_sub, V_collapsed) -> np.ndarray:
-    
     msh = W_sub.mesh
     tdim = msh.topology.dim
     if tdim == 1:
@@ -59,13 +57,13 @@ def locate_boundary_dofs_mixed_subspace(W_sub, V_collapsed) -> np.ndarray:
 
 class HydraulicNetwork:
     def __init__(
-        self,
-        G,
-        f: fem.Constant | float = 0.0,
-        g: fem.Constant | float = 0.0,
-        p_bc: fem.Function | None = None,
-        Res: fem.Constant | float = 1.0,
-        degree: int = 1,
+            self,
+            G,
+            f: fem.Constant | float = 0.0,
+            g: fem.Constant | float = 0.0,
+            p_bc: fem.Function | None = None,
+            Res: fem.Constant | float = 1.0,
+            degree: int = 1,
     ):
         self.G = G
 
@@ -73,7 +71,6 @@ class HydraulicNetwork:
         self.g = g if isinstance(g, fem.Constant) else fem.Constant(G.mesh, PETSc.ScalarType(g))
         self.Res = Res if isinstance(Res, fem.Constant) else fem.Constant(G.mesh, PETSc.ScalarType(Res))
 
-        
         q_deg = max(degree - 1, 0)
         Q_el = basix_element("DG", _cell_name(G.mesh), q_deg)
         P_el = basix_element("Lagrange", _cell_name(G.mesh), degree)
@@ -96,9 +93,9 @@ class HydraulicNetwork:
 
         dx = ufl.Measure("dx", domain=G.mesh)
         a = (
-            self.Res * ufl.inner(q, v) * dx
-            + ufl.inner(G.dds(p), v) * dx
-            - ufl.inner(G.dds(phi), q) * dx
+                self.Res * ufl.inner(q, v) * dx
+                + ufl.inner(G.dds(p), v) * dx
+                - ufl.inner(G.dds(phi), q) * dx
         )
         L = self.g * v * dx + self.f * phi * dx
         return a, L
@@ -130,7 +127,6 @@ class HydraulicNetwork:
         )
         uh = problem.solve()
 
-        
         qh_view = uh.sub(0)
         ph_view = uh.sub(1)
         Q, _ = self.W.sub(0).collapse()
@@ -199,10 +195,8 @@ v3 = ufl.TestFunction(V3)
 u1 = ufl.TrialFunction(V1)
 v1 = ufl.TestFunction(V1)
 
-
 dofs3 = locate_boundary_dofs(V3)
 bc3 = fem.dirichletbc(PETSc.ScalarType(0.0), dofs3, V3)
-
 
 u_bc_1 = fem.Function(V1)
 u_bc_1.interpolate(lambda x: x[1])
@@ -261,6 +255,7 @@ if mesh1d.comm.rank == 0:
     print("Solved coupled 3D–1D problem.")
 
 import pathlib
+
 outdir = pathlib.Path("plots/coupled1d3d-2")
 if mesh1d.comm.rank == 0:
     outdir.mkdir(parents=True, exist_ok=True)

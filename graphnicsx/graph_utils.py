@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Tuple
-
-import networkx as nx
-import numpy as np
+from typing import Dict, Iterable
 
 import dolfinx
 import dolfinx.fem
 import dolfinx.geometry
-import ufl
+import networkx as nx
+import numpy as np
 
 from .fenics_graph import FenicsGraph
 
 
 def color_graph(G: nx.Graph) -> None:
-    
     G_undir = nx.Graph(G)
     G_disconn = nx.Graph(G_undir)
 
@@ -25,7 +22,7 @@ def color_graph(G: nx.Graph) -> None:
 
     for b in bifurcation_points:
         for e in list(G_undir.edges(b)):
-            
+
             v1, v2 = e
             other = v2 if v1 == b else v1
 
@@ -35,11 +32,10 @@ def color_graph(G: nx.Graph) -> None:
                 G_disconn.nodes[new_bif_vertex]["pos"] = G_undir.nodes[b]["pos"]
 
             G_disconn.add_edge(new_bif_vertex, other)
-            
+
             if G_disconn.has_edge(v1, v2):
                 G_disconn.remove_edge(v1, v2)
 
-    
     subG = [G_disconn.subgraph(c).copy() for c in nx.connected_components(G_disconn)]
 
     n_branches = 0
@@ -60,7 +56,6 @@ def color_graph(G: nx.Graph) -> None:
                     G.edges[orig_e2]["color"] = n_branches
             n_branches += 1
 
-    
     for e in G.edges():
         if "color" not in G.edges[e]:
             G.edges[e]["color"] = n_branches
@@ -82,16 +77,14 @@ def plot_graph_color(G: nx.Graph, *, ax=None):
 
 
 def assign_radius_using_Murrays_law(
-    G: nx.DiGraph,
-    start_node: int,
-    start_radius: float,
+        G: nx.DiGraph,
+        start_node: int,
+        start_radius: float,
 ) -> FenicsGraph:
-    
     G_bfs = nx.bfs_tree(G, source=start_node)
     for n in G_bfs.nodes():
         G_bfs.nodes[n]["pos"] = G.nodes[n]["pos"]
 
-    
     for u, v in G_bfs.edges():
         p0 = np.asarray(G_bfs.nodes[u]["pos"], dtype=float)
         p1 = np.asarray(G_bfs.nodes[v]["pos"], dtype=float)
@@ -101,19 +94,15 @@ def assign_radius_using_Murrays_law(
     if len(out_edges) != 1:
         raise ValueError("start node must have a single edge sprouting from it")
 
-    
     for i, e in enumerate(G_bfs.edges()):
         u, v = e
         if i == 0:
             G_bfs.edges[e]["radius"] = float(start_radius)
             continue
 
-        
         parent_e = list(G_bfs.in_edges(u))[0]
         radius_p = float(G_bfs.edges[parent_e]["radius"])
 
-        
-        
         descendants_v = nx.descendants(G_bfs, v)
         descendants_u = nx.descendants(G_bfs, u)
 
@@ -126,7 +115,7 @@ def assign_radius_using_Murrays_law(
         len_u = subtree_length(u, descendants_u)
 
         if len_u <= 0.0:
-            
+
             n_children = max(1, len(list(G_bfs.out_edges(u))))
             fraction = 1.0 / n_children
         else:
@@ -149,11 +138,9 @@ class DistFromSource:
         if self.G.mesh is None or self.G.edge_tags is None:
             raise RuntimeError("Call G.make_mesh() before constructing DistFromSource")
 
-        
         if len(nx.get_edge_attributes(self.G, "length")) == 0:
             self.G.compute_edge_lengths()
 
-        
         Gu = nx.Graph()
         for u, v in self.G.edges():
             Gu.add_edge(u, v, length=float(self.G.edges[u, v]["length"]))
@@ -164,7 +151,6 @@ class DistFromSource:
             Gu, self.source_node, weight="length"
         )
 
-        
         mesh = self.G.mesh
         tdim = mesh.topology.dim
         mesh.topology.create_connectivity(0, tdim)
@@ -174,11 +160,9 @@ class DistFromSource:
         cell_to_edge = np.full(num_cells_local, -1, dtype=np.int32)
         cell_to_edge[self.G.edge_tags.indices] = self.G.edge_tags.values
 
-        
         num_vertices_local = mesh.topology.index_map(0).size_local
         x_vertices = mesh.geometry.x[:num_vertices_local]
 
-        
         values = np.zeros(num_vertices_local, dtype=dolfinx.default_scalar_type)
         for vi in range(num_vertices_local):
             incident = v_to_c.links(vi)
@@ -198,7 +182,6 @@ class DistFromSource:
             if p_v.shape[0] != 3:
                 p_v = np.pad(p_v, (0, 3 - p_v.shape[0]))
 
-            
             if u not in dist_node or v not in dist_node:
                 raise ValueError("Graph appears disconnected from the source node")
             if dist_node[u] <= dist_node[v]:
@@ -210,12 +193,9 @@ class DistFromSource:
 
             values[vi] = d0 + float(np.linalg.norm(x_vertices[vi] - p0))
 
-        
         V = dolfinx.fem.functionspace(mesh, ("CG", 1))
         f = dolfinx.fem.Function(V)
 
-        
-        
         num_dofs_local = V.dofmap.index_map.size_local
         f.x.array[:num_dofs_local] = values[:num_dofs_local]
         f.x.scatter_forward()
@@ -231,7 +211,6 @@ class DistFromSource:
         if points.shape[1] != 3:
             raise ValueError("Points must have shape (N, 3)")
 
-        
         tdim = mesh.topology.dim
         bb = dolfinx.geometry.bb_tree(mesh, tdim)
         collisions = dolfinx.geometry.compute_collisions_points(bb, points)
@@ -243,5 +222,5 @@ class DistFromSource:
                 cell_ids[i] = int(cells.links(i)[0])
 
         vals = self.function.eval(points, cell_ids)
-        
+
         return vals.reshape(points.shape[0], -1)[:, 0]

@@ -1,5 +1,3 @@
-
-
 from .fenics_graph import (
     FenicsGraph,
     BIF_IN,
@@ -11,8 +9,8 @@ from .fenics_graph import (
 )
 from .generators import line_graph, honeycomb, Y_bifurcation, YY_bifurcation
 from .graph_utils import color_graph, plot_graph_color, assign_radius_using_Murrays_law, DistFromSource
-from .plot import TubeFile
 from .ii import circle_operator, disk_operator, quadrature_restriction_space
+from .plot import TubeFile
 
 __all__ = [
     "FenicsGraph",
