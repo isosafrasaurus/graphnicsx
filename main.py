@@ -20,15 +20,15 @@ def y_bifurcation_tube():
     
     assert G.mesh.topology.dim == 1
     assert G.mesh.geometry.dim == 3
+    assert hasattr(G, "edge_submeshes")
     assert len(G.edge_submeshes) == len(G.edges())
 
     
     
-    V = fem.FunctionSpace(G.mesh, ("CG", 1))
-    f = fem.Function(V)
+    V = fem.functionspace(G.mesh, ("CG", 1))
+    f = fem.Function(V, name="xcoord")
     f.interpolate(lambda x: x[0])
 
-    
     if MPI.COMM_WORLD.rank == 0:
         print("Writing TubeFile output: out.pvd")
 

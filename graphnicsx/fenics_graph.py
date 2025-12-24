@@ -20,6 +20,7 @@ except ImportError as e:
     ) from e
 
 
+
 BIF_IN = 1
 BIF_OUT = 2
 BOUN_IN = 3
@@ -27,6 +28,7 @@ BOUN_OUT = 4
 
 
 def _as_3d(x: Iterable[float]) -> np.ndarray:
+    
     arr = np.asarray(list(x), dtype=np.float64)
     if arr.shape == (3,):
         return arr
@@ -49,6 +51,8 @@ class EdgeSubmesh:
 
 
 class FenicsGraph(nx.DiGraph):
+    
+
     def __init__(self, incoming_graph_data=None, **attr):
         super().__init__(incoming_graph_data=incoming_graph_data, **attr)
 
@@ -61,6 +65,13 @@ class FenicsGraph(nx.DiGraph):
         self.edge_to_id: Dict[Tuple[int, int], int] = {}
         self.node_to_vertex: Dict[int, int] = {}
         self.tangent: Optional[dolfinx.fem.Function] = None
+
+        
+        
+        
+        
+        
+        self.edge_submeshes: Dict[Tuple[int, int], Optional[EdgeSubmesh]] = {}
 
         
         self.bifurcation_ixs: List[int] = []
@@ -132,6 +143,10 @@ class FenicsGraph(nx.DiGraph):
                 cells.append((a, b))
                 cell_edge_ids.append(edge_id)
 
+        
+        
+        
+        
         self._cell_edge_ids_global = np.asarray(cell_edge_ids, dtype=np.int32)
 
         x = np.asarray(coords, dtype=np.float64)
@@ -204,8 +219,12 @@ class FenicsGraph(nx.DiGraph):
         return mesh
 
     def make_submeshes(self) -> None:
+        
         if self.mesh is None or self.edge_tags is None:
             raise RuntimeError("Call make_mesh() before make_submeshes().")
+
+        
+        self.edge_submeshes = {e: None for e in self.edge_list}
 
         
         self.mesh.topology.create_connectivity(0, 1)
@@ -218,7 +237,6 @@ class FenicsGraph(nx.DiGraph):
             edge_cells = self.edge_tags.find(edge_id)
             edge_cells = np.asarray(edge_cells, dtype=np.int32)
             if edge_cells.size == 0:
-                
                 
                 
                 continue
@@ -295,6 +313,12 @@ class FenicsGraph(nx.DiGraph):
                 vertex_tags=vertex_tags,
             )
 
+            
+            self.edge_submeshes[e] = self.edges[e]["submesh"]
+
+    
+    
+    
 
     def record_bifurcation_and_boundary_nodes(self) -> None:
         
@@ -347,6 +371,10 @@ class FenicsGraph(nx.DiGraph):
             self.degree_min = 0.0
             self.degree_max = 0.0
 
+    
+    
+    
+
     def assign_tangents(self) -> None:
         
         if self.mesh is None or self.edge_tags is None:
@@ -369,7 +397,17 @@ class FenicsGraph(nx.DiGraph):
         num_cells = self.mesh.topology.index_map(tdim).size_local
         dm = Vt.dofmap.list[:num_cells]
         
-        value_size = int(np.prod(Vt.element.basix_element.value_shape))
+        
+        
+        
+        
+        value_shape = Vt.element.basix_element.value_shape
+        value_size = int(np.prod(value_shape)) if len(value_shape) > 0 else 1
+        bs = Vt.dofmap.bs
+        if bs > 1:
+            
+            assert value_size == 1, "Unexpected combined value_shape and block size"
+            value_size = bs
         assert value_size == 3
 
         
@@ -432,6 +470,7 @@ class FenicsGraph(nx.DiGraph):
         padding: float = 1e-12,
         dtype=np.float64,
     ):
+        
         if self.mesh is None or self.edge_tags is None:
             raise RuntimeError("Call make_mesh() before building attribute callables")
 
@@ -440,6 +479,13 @@ class FenicsGraph(nx.DiGraph):
         tdim = self.mesh.topology.dim
         imap = self.mesh.topology.index_map(tdim)
         num_cells = imap.size_local + imap.num_ghosts
+
+        
+        
+        
+        
+        
+        
         cell_to_edge = np.full(num_cells, -1, dtype=np.int32)
         try:
             orig = np.asarray(self.mesh.topology.original_cell_index, dtype=np.int64)
@@ -519,6 +565,7 @@ def copy_from_nx_graph(G_nx: nx.Graph) -> FenicsGraph:
 
 
 def nxgraph_attribute_to_dolfinx(G: FenicsGraph, attr: str) -> dolfinx.fem.Function:
+    
     if G.mesh is None or G.edge_tags is None:
         raise RuntimeError("Call G.make_mesh() before converting attributes")
 

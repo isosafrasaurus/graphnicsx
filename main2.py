@@ -23,7 +23,7 @@ def _cell_name(msh: mesh.Mesh) -> str:
     return s.split("(")[-1].split(")")[0].strip("'\"")
 
 
-def locate_boundary_dofs(V: fem.FunctionSpace) -> np.ndarray:
+def locate_boundary_dofs(V) -> np.ndarray:
     
     msh = V.mesh
     tdim = msh.topology.dim
@@ -40,9 +40,7 @@ def locate_boundary_dofs(V: fem.FunctionSpace) -> np.ndarray:
     return dofs
 
 
-def locate_boundary_dofs_mixed_subspace(
-        W_sub: fem.FunctionSpace, V_collapsed: fem.FunctionSpace
-) -> np.ndarray:
+def locate_boundary_dofs_mixed_subspace(W_sub, V_collapsed) -> np.ndarray:
     
     msh = W_sub.mesh
     tdim = msh.topology.dim
@@ -60,15 +58,14 @@ def locate_boundary_dofs_mixed_subspace(
 
 
 class HydraulicNetwork:
-
     def __init__(
-            self,
-            G,
-            f: fem.Constant | float = 0.0,
-            g: fem.Constant | float = 0.0,
-            p_bc: fem.Function | None = None,
-            Res: fem.Constant | float = 1.0,
-            degree: int = 1,
+        self,
+        G,
+        f: fem.Constant | float = 0.0,
+        g: fem.Constant | float = 0.0,
+        p_bc: fem.Function | None = None,
+        Res: fem.Constant | float = 1.0,
+        degree: int = 1,
     ):
         self.G = G
 
@@ -77,19 +74,16 @@ class HydraulicNetwork:
         self.Res = Res if isinstance(Res, fem.Constant) else fem.Constant(G.mesh, PETSc.ScalarType(Res))
 
         
-        
         q_deg = max(degree - 1, 0)
         Q_el = basix_element("DG", _cell_name(G.mesh), q_deg)
         P_el = basix_element("Lagrange", _cell_name(G.mesh), degree)
         W_el = basix_mixed_element([Q_el, P_el])
         self.W = fem.functionspace(G.mesh, W_el)
 
-        
         q, p = ufl.TrialFunctions(self.W)
         v, phi = ufl.TestFunctions(self.W)
         self.q, self.p, self.v, self.phi = q, p, v, phi
 
-        
         if p_bc is None:
             Vp, _ = self.W.sub(1).collapse()
             p_bc = fem.Function(Vp)
@@ -101,17 +95,15 @@ class HydraulicNetwork:
         q, p, v, phi = self.q, self.p, self.v, self.phi
 
         dx = ufl.Measure("dx", domain=G.mesh)
-
         a = (
-                self.Res * ufl.inner(q, v) * dx
-                + ufl.inner(G.dds(p), v) * dx
-                - ufl.inner(G.dds(phi), q) * dx
+            self.Res * ufl.inner(q, v) * dx
+            + ufl.inner(G.dds(p), v) * dx
+            - ufl.inner(G.dds(phi), q) * dx
         )
         L = self.g * v * dx + self.f * phi * dx
         return a, L
 
     def bcs(self):
-        
         Vp, _ = self.W.sub(1).collapse()
         dofs = locate_boundary_dofs_mixed_subspace(self.W.sub(1), Vp)
         bc = fem.dirichletbc(self.p_bc, dofs, self.W.sub(1))
@@ -153,13 +145,10 @@ class HydraulicNetwork:
 G = Y_bifurcation(dim=3)
 G.make_mesh(n=4)
 
-
-
 for e in G.edges():
     G.edges[e]["radius"] = 0.05
 
-
-Vp = fem.FunctionSpace(G.mesh, ("CG", 1))
+Vp = fem.functionspace(G.mesh, ("CG", 1))
 p_bc = fem.Function(Vp)
 p_bc.interpolate(lambda x: x[1])
 
@@ -169,13 +158,13 @@ q1d, p1d = model.solve()
 if G.mesh.comm.rank == 0:
     print("Solved 1D hydraulic network.")
 
-
 import pathlib as _pathlib
 
 hydro_out = _pathlib.Path("plots/hydraulic1d")
 if G.mesh.comm.rank == 0:
     hydro_out.mkdir(parents=True, exist_ok=True)
 G.mesh.comm.barrier()
+
 if G.mesh.comm.rank == 0:
     tube_h = TubeFile(G, str(hydro_out / "pressure1d_tube.pvd"))
     tube_h << (p1d, 0)
@@ -187,12 +176,8 @@ mesh1d = G.mesh
 for e in G.edges():
     G.edges[e]["radius"] = 0.05
 
-
 pos = nx.get_node_attributes(G, "pos")
 node_coords = np.asarray(list(pos.values()), dtype=float)
-
-
-
 
 R = 0.1
 margin = R + 0.05
@@ -206,9 +191,8 @@ mesh3d = mesh.create_box(
     cell_type=mesh.CellType.tetrahedron,
 )
 
-
-V3 = fem.FunctionSpace(mesh3d, ("CG", 1))
-V1 = fem.FunctionSpace(mesh1d, ("CG", 1))
+V3 = fem.functionspace(mesh3d, ("CG", 1))
+V1 = fem.functionspace(mesh1d, ("CG", 1))
 
 u3 = ufl.TrialFunction(V3)
 v3 = ufl.TestFunction(V3)
@@ -216,9 +200,8 @@ u1 = ufl.TrialFunction(V1)
 v1 = ufl.TestFunction(V1)
 
 
-
 dofs3 = locate_boundary_dofs(V3)
-bc3 = fem.dirichletbc(fem.Constant(mesh3d, PETSc.ScalarType(0.0)), dofs3, V3)
+bc3 = fem.dirichletbc(PETSc.ScalarType(0.0), dofs3, V3)
 
 
 u_bc_1 = fem.Function(V1)
@@ -226,13 +209,10 @@ u_bc_1.interpolate(lambda x: x[1])
 dofs1 = locate_boundary_dofs(V1)
 bc1 = fem.dirichletbc(u_bc_1, dofs1)
 
-
 beta = 1.0
 circum = 2.0 * np.pi
 
-
 circle_op = fenicsx_ii.Circle(mesh1d, radius=R, degree=10)
-
 
 Pi_u = fenicsx_ii.Average(u3, circle_op, V1)
 Pi_v = fenicsx_ii.Average(v3, circle_op, V1)
@@ -240,37 +220,30 @@ Pi_v = fenicsx_ii.Average(v3, circle_op, V1)
 dx3 = ufl.Measure("dx", domain=mesh3d)
 dx1 = ufl.Measure("dx", domain=mesh1d)
 
-
 a00 = ufl.inner(ufl.grad(u3), ufl.grad(v3)) * dx3 + circum * beta * ufl.inner(Pi_u, Pi_v) * dx1
 a01 = -beta * circum * ufl.inner(u1, Pi_v) * dx1
 a10 = -beta * ufl.inner(Pi_u, v1) * dx1
 a11 = ufl.inner(ufl.grad(u1), ufl.grad(v1)) * dx1 + beta * ufl.inner(u1, v1) * dx1
 
-
 zero1 = fem.Constant(mesh1d, PETSc.ScalarType(0.0))
-zero3 = fem.Constant(mesh3d, PETSc.ScalarType(0.0))
 L0 = ufl.inner(zero1, Pi_v) * dx1
 L1 = ufl.inner(zero1, v1) * dx1
 
-
 A00 = fenicsx_ii.assemble_matrix(a00, bcs=[bc3])
-A01 = fenicsx_ii.assemble_matrix(a01, bcs=[bc3])  
-A10 = fenicsx_ii.assemble_matrix(a10, bcs=[bc1])  
+A01 = fenicsx_ii.assemble_matrix(a01, bcs=[bc3])
+A10 = fenicsx_ii.assemble_matrix(a10, bcs=[bc1])
 A11 = fenicsx_ii.assemble_matrix(a11, bcs=[bc1])
 
 b0 = fenicsx_ii.assemble_vector(L0, bcs=[bc3])
 b1 = fenicsx_ii.assemble_vector(L1, bcs=[bc1])
 
-
 A = PETSc.Mat().createNest([[A00, A01], [A10, A11]], comm=mesh1d.comm)
 A.assemble()
-
 b = PETSc.Vec().createNest([b0, b1], comm=mesh1d.comm)
 
 u3_h = fem.Function(V3, name="pressure3d")
 u1_h = fem.Function(V1, name="pressure1d")
 x_sol = PETSc.Vec().createNest([u3_h.x.petsc_vec, u1_h.x.petsc_vec], comm=mesh1d.comm)
-
 
 ksp = PETSc.KSP().create(mesh1d.comm)
 ksp.setOperators(A)
@@ -279,9 +252,7 @@ pc = ksp.getPC()
 pc.setType("lu")
 pc.setFactorSolverType("mumps")
 ksp.setFromOptions()
-
 ksp.solve(b, x_sol)
-
 
 u3_h.x.scatter_forward()
 u1_h.x.scatter_forward()
@@ -289,20 +260,15 @@ u1_h.x.scatter_forward()
 if mesh1d.comm.rank == 0:
     print("Solved coupled 3D–1D problem.")
 
-
 import pathlib
-
 outdir = pathlib.Path("plots/coupled1d3d-2")
 if mesh1d.comm.rank == 0:
     outdir.mkdir(parents=True, exist_ok=True)
 mesh1d.comm.barrier()
 
-
-
 if mesh1d.comm.rank == 0:
     tube = TubeFile(G, str(outdir / "pressure1d_tube.pvd"))
     tube << (u1_h, 0)
-
 
 with io.VTKFile(mesh3d.comm, str(outdir / "pressure3d.pvd"), "w") as vtk:
     vtk.write_mesh(mesh3d)
